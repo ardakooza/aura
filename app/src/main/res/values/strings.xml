@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Aura</string>
+    <string name="tagline">Minimalist AI Virtual Studio</string>
+    <string name="tab_studio">Studio</string>
+    <string name="tab_presets">Catalog</string>
+    <string name="tab_lookbook">Lookbook</string>
+    <string name="category_eyewear">Eyewear</string>
+    <string name="category_headwear">Headwear</string>
+    <string name="category_hairstyles">Hairstyles</string>
+    <string name="category_outfits">Outfits</string>
+    <string name="btn_apply_tryon">Generate Try-On</string>
+    <string name="btn_select_photo">Select Portrait</string>
+    <string name="btn_take_photo">Camera</string>
+    <string name="btn_demo_portrait">Sample Models</string>
+    <string name="resolution_label">Resolution</string>
+    <string name="aura_score_title">Aura Score</string>
+</resources>
