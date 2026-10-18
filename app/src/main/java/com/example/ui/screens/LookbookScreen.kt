@@ -63,6 +63,8 @@ import com.example.ui.theme.AuraWhite
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.ui.components.AuraShape
+import com.example.ui.components.pressable
 
 @Composable
 fun LookbookScreen(
@@ -89,7 +91,8 @@ fun LookbookScreen(
                 LookbookCard(
                     item = item,
                     onClick = { selectedLook = item },
-                    onDelete = { viewModel.deleteLookbookItem(item.id) }
+                    onDelete = { viewModel.deleteLookbookItem(item.id) },
+                    modifier = Modifier.animateItem()
                 )
             }
         }
@@ -159,7 +162,8 @@ fun LookbookScreen(
 fun LookbookCard(
     item: LookbookItem,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val dateStr = remember(item.timestamp) {
         val sdf = SimpleDateFormat("d MMM, HH:mm", Locale.getDefault())
@@ -167,12 +171,12 @@ fun LookbookCard(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
+            .pressable(pressedScale = 0.97f) { onClick() }
+            .clip(AuraShape.Card)
             .background(AuraCardDark)
-            .border(1.dp, AuraCardBorder, RoundedCornerShape(22.dp))
-            .clickable { onClick() }
+            .border(1.dp, AuraCardBorder, AuraShape.Card)
             .padding(10.dp)
             .testTag("lookbook_card_${item.id}")
     ) {
@@ -276,7 +280,7 @@ private fun EmptyLookbookPrompt(onGoToStudio: () -> Unit) {
         Spacer(modifier = Modifier.height(18.dp))
 
         Text(
-            text = "Henüz Kaydedilen Görsel Yok",
+            text = "Lookbook boş",
             color = AuraWhite,
             fontSize = 17.sp,
             fontWeight = FontWeight.SemiBold
@@ -285,7 +289,7 @@ private fun EmptyLookbookPrompt(onGoToStudio: () -> Unit) {
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = "Stüdyoda oluşturduğunuz portreleri Aura puanları ile birlikte buraya kaydedebilirsiniz.",
+            text = "Stüdyoda bir look oluşturup Kaydet'e dokunun. Puanıyla birlikte burada görünür.",
             color = AuraTextMuted,
             fontSize = 12.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -310,8 +314,8 @@ private fun EmptyLookbookPrompt(onGoToStudio: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = "Stüdyoya Dön",
-                fontWeight = FontWeight.Bold,
+                text = "Stüdyoya git",
+                fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp
             )
         }

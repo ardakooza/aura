@@ -1,28 +1,24 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,102 +26,128 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.AuraTextMuted
 import com.example.ui.theme.AuraWhite
 
+/**
+ * Processing overlay: a scan line sweeps the portrait between viewfinder corners while
+ * the current stage message crossfades at the bottom. All animated values are read
+ * inside draw/graphicsLayer lambdas, so the sweep never triggers recomposition.
+ */
 @Composable
 fun ShimmerPortraitOverlay(
     stageMessage: String,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "shimmerTransition")
-    val translateAnim by infiniteTransition.animateFloat(
-        initialValue = -500f,
-        targetValue = 1500f,
+    val transition = rememberInfiniteTransition(label = "scan")
+    val scan by transition.animateFloat(
+        initialValue = 0.04f,
+        targetValue = 0.96f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(durationMillis = 1900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "shimmerTranslate"
+        label = "scanLine"
+    )
+    val sweep by transition.animateFloat(
+        initialValue = -0.4f,
+        targetValue = 1.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2600, easing = LinearEasing)
+        ),
+        label = "sweep"
+    )
+    val pulse by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
     )
 
-    val shimmerBrush = Brush.linearGradient(
-        colors = listOf(
-            Color.Transparent,
-            Color.White.copy(alpha = 0.08f),
-            Color.White.copy(alpha = 0.35f), // Bright shimmer specular band
-            Color.White.copy(alpha = 0.08f),
-            Color.Transparent
-        ),
-        start = Offset(translateAnim, translateAnim),
-        end = Offset(translateAnim + 400f, translateAnim + 400f)
-    )
+    Box(modifier = modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(Color.Black.copy(alpha = 0.42f))
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.65f))
-    ) {
-        // Sweeping diagonal shimmer scan
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(shimmerBrush)
-        )
+            // Soft diagonal sheen travelling across the frame
+            val sx = sweep * size.width
+            drawRect(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.10f),
+                        Color.Transparent
+                    ),
+                    start = Offset(sx - size.width * 0.25f, 0f),
+                    end = Offset(sx + size.width * 0.25f, size.height * 0.4f)
+                )
+            )
 
-        // Center HUD
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            // Scan line with a trailing glow
+            val y = scan * size.height
+            val band = size.height * 0.2f
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.16f),
+                        Color.Transparent
+                    ),
+                    startY = y - band,
+                    endY = y + band
+                ),
+                topLeft = Offset(0f, y - band),
+                size = Size(size.width, band * 2f)
+            )
+            drawLine(
+                color = Color.White.copy(alpha = 0.9f),
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = 1.5.dp.toPx()
+            )
+
+            drawCornerBrackets(
+                color = Color.White.copy(alpha = 0.5f + 0.4f * pulse),
+                inset = 18.dp.toPx(),
+                length = 22.dp.toPx(),
+                strokeWidth = 2.dp.toPx()
+            )
+        }
+
+        GlassChip(
             modifier = Modifier
-                .align(Alignment.Center)
-                .padding(24.dp)
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 20.dp, start = 20.dp, end = 20.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.Black.copy(alpha = 0.75f))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = AuraWhite,
-                        strokeWidth = 2.5.dp
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "AURA AI TARAMA",
-                        color = AuraWhite,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                }
+                    .size(6.dp)
+                    .graphicsLayer { alpha = pulse }
+                    .clip(CircleShape)
+                    .background(AuraWhite)
+            )
+            AnimatedContent(
+                targetState = stageMessage,
+                transitionSpec = { fadeIn(tween(250, delayMillis = 80)) togetherWith fadeOut(tween(150)) },
+                label = "stageMessage"
+            ) { message ->
+                Text(
+                    text = message,
+                    color = AuraWhite,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    modifier = Modifier.widthIn(max = 250.dp)
+                )
             }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Text(
-                text = stageMessage,
-                color = AuraWhite,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "3D Işıklandırma ve Yüz Uyumu Hesaplanıyor",
-                color = AuraTextMuted,
-                fontSize = 11.sp
-            )
         }
     }
 }

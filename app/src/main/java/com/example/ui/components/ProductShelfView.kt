@@ -67,6 +67,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
+
+private fun ItemCategory.shortLabel(): String = when (this) {
+    ItemCategory.HEADWEAR -> "Şapka"
+    ItemCategory.EYEWEAR -> "Gözlük"
+    ItemCategory.HAIRSTYLES -> "Saç"
+}
 
 @Composable
 fun ProductShelfView(
@@ -85,105 +98,40 @@ fun ProductShelfView(
     onEndDrag: () -> Unit = {},
     onCancelDrag: () -> Unit = {}
 ) {
+    val categories = ItemCategory.values()
+    val shelfAlpha by animateFloatAsState(
+        targetValue = if (hasPortrait) 1f else 0.35f,
+        animationSpec = tween(300),
+        label = "shelfAlpha"
+    )
+
     Box(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (!hasPortrait) Modifier.alpha(0.35f) else Modifier)
+                .alpha(shelfAlpha)
         ) {
-            // Category & Gender Filter Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Shelf Category Tabs: Gözlük Modelleri & Saç Stilleri
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ItemCategory.values().forEach { category ->
-                        val isSelected = category == selectedCategory
-                        val bg by animateColorAsState(if (isSelected) AuraWhite else AuraPillInactive, label = "shelfTabBg")
-                        val txt by animateColorAsState(if (isSelected) Color.Black else AuraTextMuted, label = "shelfTabTxt")
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(bg)
-                                .border(1.dp, if (isSelected) AuraWhite else AuraCardBorder, RoundedCornerShape(18.dp))
-                                .clickable(enabled = hasPortrait) { onSelectCategory(category) }
-                                .padding(horizontal = 14.dp, vertical = 8.dp)
-                                .testTag("shelf_tab_${category.name.lowercase()}"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val icon = when (category) {
-                                    ItemCategory.EYEWEAR -> Icons.Default.Visibility
-                                    ItemCategory.HAIRSTYLES -> Icons.Default.FaceRetouchingNatural
-                                }
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = null,
-                                    tint = txt,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = category.trTitle,
-                                    color = txt,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Filter Pill: Önerilen (Cinsiyet) vs Tümü
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(if (showAllItems) AuraPillInactive else Color.White.copy(alpha = 0.12f))
-                        .border(1.dp, AuraCardBorder, RoundedCornerShape(14.dp))
-                        .clickable(enabled = hasPortrait) { onToggleShowAll() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                        .testTag("gender_filter_toggle"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.FilterList,
-                            contentDescription = null,
-                            tint = AuraWhite,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (showAllItems) "Tümü (${itemsForCategory.size})" else "${userGender.label} (${itemsForCategory.size})",
-                            color = AuraWhite,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
+            AuraSegmentedControl(
+                options = categories.map {
+                    SegmentOption(
+                        label = it.shortLabel(),
+                        testTag = "shelf_tab_${it.name.lowercase()}"
+                    )
+                },
+                selectedIndex = categories.indexOf(selectedCategory).coerceAtLeast(0),
+                onSelect = { onSelectCategory(categories[it]) },
+                enabled = hasPortrait,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // The Physical "Raf" (Shelf) Container
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFF1E1E22), // Top illuminated acrylic edge
-                                Color(0xFF121214)  // Base shelf
-                            )
-                        )
-                    )
-                    .border(1.dp, AuraCardBorder, RoundedCornerShape(26.dp))
+                    .clip(AuraShape.Card)
+                    .background(AuraCardDark)
+                    .border(1.dp, AuraCardBorder, AuraShape.Card)
                     .padding(vertical = 16.dp)
             ) {
                 Column {
@@ -194,31 +142,59 @@ fun ProductShelfView(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "3D GERÇEK ÜRÜN RAFI",
-                            color = AuraTextMuted,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp
-                        )
-                        Text(
-                            text = "Kaydır ve Rafa Ekle",
-                            color = AuraWhite,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = selectedCategory.trTitle,
+                                color = AuraWhite,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Dokun: ekle  ·  Basılı tut: portreye sürükle",
+                                color = AuraTextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Filter pill: gender-recommended vs all
+                        Row(
+                            modifier = Modifier
+                                .pressable(enabled = hasPortrait) { onToggleShowAll() }
+                                .clip(AuraShape.Chip)
+                                .background(if (showAllItems) AuraPillInactive else Color.White.copy(alpha = 0.12f))
+                                .border(1.dp, AuraCardBorder, AuraShape.Chip)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .testTag("gender_filter_toggle"),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = null,
+                                tint = AuraWhite,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (showAllItems) "Tümü (${itemsForCategory.size})" else "${userGender.label} (${itemsForCategory.size})",
+                                color = AuraWhite,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    // Horizontal Scrolling 3D Shelf with Smooth Tactile Physics
                     val listState = rememberLazyListState()
                     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
                     LazyRow(
                         state = listState,
                         flingBehavior = flingBehavior,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -236,74 +212,59 @@ fun ProductShelfView(
                             )
                         }
                     }
-
-                    // Illuminated Shelf Runner Rail
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(3.dp)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        AuraWhite.copy(alpha = 0.5f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
-                    )
                 }
             }
         }
 
-        // Portrait-First Lock Overlay (Requirement 5)
-        if (!hasPortrait) {
+        // Portrait-first lock: the shelf is only usable once there is a face to try things on.
+        AnimatedVisibility(
+            visible = !hasPortrait,
+            enter = fadeIn(),
+            exit = fadeOut(tween(250)),
+            modifier = Modifier.matchParentSize()
+        ) {
             Box(
                 modifier = Modifier
-                    .matchParentSize()
+                    .fillMaxSize()
                     .clickable(enabled = false) {},
                 contentAlignment = Alignment.Center
             ) {
-                Box(
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(24.dp))
+                        .clip(AuraShape.Control)
                         .background(Color.Black.copy(alpha = 0.88f))
-                        .border(1.dp, AuraWhite.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
-                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                        .border(1.dp, AuraWhite.copy(alpha = 0.25f), AuraShape.Control)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                         .testTag("shelf_locked_overlay"),
-                    contentAlignment = Alignment.Center
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(AuraPillInactive),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Locked",
-                                tint = AuraWhite,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "ÖNCE PORTRENİZİ YÜKLEYİN",
-                                color = AuraWhite,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            )
-                            Text(
-                                text = "3D ürünleri denemek için önce bir selfie yükleyin",
-                                color = AuraTextMuted,
-                                fontSize = 10.sp
-                            )
-                        }
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(AuraPillInactive),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Locked",
+                            tint = AuraWhite,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Önce bir portre ekleyin",
+                            color = AuraWhite,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Ürünleri denemek için selfie yükleyin",
+                            color = AuraTextMuted,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }
@@ -327,18 +288,35 @@ fun ShelfProduct3DCard(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "cardScale"
     )
-
-    val borderColor = if (isStaged) AuraWhite else AuraCardBorder
-    val borderWidth = if (isStaged) 2.dp else 1.dp
+    val borderColor by animateColorAsState(
+        targetValue = if (isStaged) AuraWhite else AuraCardBorder,
+        animationSpec = tween(200),
+        label = "cardBorder"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (isStaged) 1.5.dp else 1.dp,
+        animationSpec = tween(200),
+        label = "cardBorderWidth"
+    )
+    val badgeBg by animateColorAsState(
+        targetValue = if (isStaged) AuraWhite else AuraPillInactive,
+        animationSpec = tween(200),
+        label = "badgeBg"
+    )
+    val badgeScale by animateFloatAsState(
+        targetValue = if (isStaged) 1.12f else 1f,
+        animationSpec = spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium),
+        label = "badgeScale"
+    )
     var itemPositionInWindow by remember { mutableStateOf(Offset.Zero) }
 
     Box(
         modifier = Modifier
             .width(158.dp)
             .scale(scale)
-            .clip(RoundedCornerShape(22.dp))
+            .clip(AuraShape.Card)
             .background(AuraSurfaceElevated)
-            .border(borderWidth, borderColor, RoundedCornerShape(22.dp))
+            .border(borderWidth, borderColor, AuraShape.Card)
             .onGloballyPositioned { coordinates ->
                 itemPositionInWindow = coordinates.positionInWindow()
             }
@@ -356,36 +334,37 @@ fun ShelfProduct3DCard(
                     onDragCancel = { onCancelDrag() }
                 )
             }
-            .clickable(enabled = enabled) { onSelect() }
+            .pressable(enabled = enabled, pressedScale = 0.97f) { onSelect() }
             .padding(12.dp)
             .testTag("shelf_product_${item.id}")
     ) {
         Column {
-            // 3D Product Visual Box
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(98.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(AuraShape.Control)
                     .background(
                         Brush.radialGradient(
                             colors = listOf(Color(0xFF2A2A32), Color(0xFF141416))
                         )
                     )
-                    .border(1.dp, AuraCardBorder, RoundedCornerShape(16.dp)),
+                    .border(1.dp, AuraCardBorder, AuraShape.Control),
                 contentAlignment = Alignment.Center
             ) {
-                // Realistic 3D Product Visual
-                PhotorealisticProductGlyph(category = item.category, itemId = item.id)
+                ProductGlyph(category = item.category, itemId = item.id)
 
-                // Staged Toggle Badge
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
                         .size(22.dp)
+                        .graphicsLayer {
+                            scaleX = badgeScale
+                            scaleY = badgeScale
+                        }
                         .clip(CircleShape)
-                        .background(if (isStaged) AuraWhite else AuraPillInactive),
+                        .background(badgeBg),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -396,7 +375,6 @@ fun ShelfProduct3DCard(
                     )
                 }
 
-                // Brand / Model Tag
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -408,7 +386,7 @@ fun ShelfProduct3DCard(
                     Text(
                         text = item.styleTag,
                         color = AuraWhite,
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -419,7 +397,7 @@ fun ShelfProduct3DCard(
             Text(
                 text = item.name,
                 color = AuraWhite,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -430,8 +408,7 @@ fun ShelfProduct3DCard(
             Text(
                 text = item.brandOrModelRef,
                 color = AuraTextMuted,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Normal,
+                fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -441,7 +418,7 @@ fun ShelfProduct3DCard(
             Text(
                 text = item.material,
                 color = Color(0xFF888890),
-                fontSize = 9.sp,
+                fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -450,12 +427,36 @@ fun ShelfProduct3DCard(
 }
 
 @Composable
-private fun PhotorealisticProductGlyph(category: ItemCategory, itemId: String) {
+private fun ProductGlyph(category: ItemCategory, itemId: String) {
     Canvas(modifier = Modifier.size(64.dp)) {
         val w = size.width
         val h = size.height
 
         when (category) {
+            ItemCategory.HEADWEAR -> {
+                val crown = Path().apply {
+                    moveTo(w * 0.26f, h * 0.60f)
+                    cubicTo(w * 0.26f, h * 0.20f, w * 0.74f, h * 0.20f, w * 0.74f, h * 0.60f)
+                }
+                drawPath(
+                    path = crown,
+                    color = Color.White,
+                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.5f),
+                    start = Offset(w * 0.27f, h * 0.50f),
+                    end = Offset(w * 0.73f, h * 0.50f),
+                    strokeWidth = 1.5.dp.toPx()
+                )
+                drawLine(
+                    color = Color.White,
+                    start = Offset(w * 0.12f, h * 0.64f),
+                    end = Offset(w * 0.88f, h * 0.64f),
+                    strokeWidth = 3.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
             ItemCategory.EYEWEAR -> {
                 val frameColor = when {
                     itemId.contains("tf") || itemId.contains("aviator") -> Color(0xFFE0E0E6)

@@ -50,6 +50,12 @@ import com.example.ui.theme.AuraScoreRingProgress
 import com.example.ui.theme.AuraScoreRingTrack
 import com.example.ui.theme.AuraTextMuted
 import com.example.ui.theme.AuraWhite
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.font.FontFamily
+import kotlinx.coroutines.delay
 
 @Composable
 fun AuraScoreWidget(
@@ -59,6 +65,7 @@ fun AuraScoreWidget(
     modifier: Modifier = Modifier
 ) {
     val animatedProgress = remember { Animatable(0f) }
+    var isSaved by remember(score) { mutableStateOf(false) }
 
     LaunchedEffect(score.overallScore) {
         animatedProgress.animateTo(
@@ -70,9 +77,9 @@ fun AuraScoreWidget(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+            .clip(AuraShape.Card)
             .background(AuraCardDark)
-            .border(1.dp, AuraCardBorder, RoundedCornerShape(28.dp))
+            .border(1.dp, AuraCardBorder, AuraShape.Card)
             .padding(20.dp)
             .testTag("aura_score_widget")
     ) {
@@ -101,11 +108,10 @@ fun AuraScoreWidget(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "AURA SCORE",
+                            text = "Aura skoru",
                             color = AuraTextMuted,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
 
@@ -113,8 +119,10 @@ fun AuraScoreWidget(
                     Text(
                         text = score.verdict,
                         color = AuraWhite,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Serif,
+                        lineHeight = 25.sp
                     )
                 }
 
@@ -146,8 +154,10 @@ fun AuraScoreWidget(
                         Text(
                             text = "${(animatedProgress.value * 100).toInt()}",
                             color = AuraWhite,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Serif,
+                            style = AuraTabularNums
                         )
                         Text(
                             text = "/100",
@@ -170,18 +180,21 @@ fun AuraScoreWidget(
                     label = "Uyum",
                     value = "${score.harmonyScore}%",
                     progress = score.harmonyScore / 100f,
+                    delayMillis = 250,
                     modifier = Modifier.weight(1f)
                 )
                 MetricPill(
                     label = "Işıklandırma",
                     value = "${score.lightingScore}%",
                     progress = score.lightingScore / 100f,
+                    delayMillis = 400,
                     modifier = Modifier.weight(1f)
                 )
                 MetricPill(
                     label = "Geometri",
                     value = "${score.geometryScore}%",
                     progress = score.geometryScore / 100f,
+                    delayMillis = 550,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -229,26 +242,31 @@ fun AuraScoreWidget(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Button(
-                    onClick = onSaveToLookbook,
+                    onClick = {
+                        if (!isSaved) {
+                            isSaved = true
+                            onSaveToLookbook()
+                        }
+                    },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AuraWhite,
                         contentColor = Color.Black
                     ),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = AuraShape.Control,
                     modifier = Modifier
                         .weight(1f)
                         .height(46.dp)
                         .testTag("save_lookbook_button")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Bookmark,
+                        imageVector = if (isSaved) Icons.Default.Check else Icons.Default.Bookmark,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Kaydet",
-                        fontWeight = FontWeight.Bold,
+                        text = if (isSaved) "Kaydedildi" else "Kaydet",
+                        fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp
                     )
                 }
@@ -258,7 +276,7 @@ fun AuraScoreWidget(
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = AuraWhite
                     ),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = AuraShape.Control,
                     border = androidx.compose.foundation.BorderStroke(1.dp, AuraCardBorder),
                     modifier = Modifier
                         .weight(1f)
@@ -287,8 +305,15 @@ private fun MetricPill(
     label: String,
     value: String,
     progress: Float,
+    delayMillis: Int,
     modifier: Modifier = Modifier
 ) {
+    val animated = remember { Animatable(0f) }
+    LaunchedEffect(progress) {
+        delay(delayMillis.toLong())
+        animated.animateTo(progress, tween(durationMillis = 700, easing = FastOutSlowInEasing))
+    }
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -312,12 +337,13 @@ private fun MetricPill(
                     text = value,
                     color = AuraWhite,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    style = AuraTabularNums
                 )
             }
             Spacer(modifier = Modifier.height(6.dp))
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { animated.value },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp)

@@ -78,11 +78,11 @@ fun AuraTopBar(
                     fontFamily = FontFamily.Serif
                 )
                 Text(
-                    text = "ATELIER • ${userProfile.gender.label.uppercase()}",
+                    text = "Atelier",
                     color = AuraTextMuted,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.2.sp
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.6.sp
                 )
             }
         }

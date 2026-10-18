@@ -68,6 +68,31 @@ import com.example.ui.theme.AuraWhite
 import com.example.util.QualityAssessment
 import com.example.util.QualityStatus
 import kotlin.math.roundToInt
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun BeforeAfterViewport(
@@ -85,27 +110,51 @@ fun BeforeAfterViewport(
     modifier: Modifier = Modifier,
     isDropTargetActive: Boolean = false
 ) {
-    val borderColor = if (isDropTargetActive) AuraWhite else AuraCardBorder
-    val borderWidth = if (isDropTargetActive) 2.5.dp else 1.dp
+    val borderColor by animateColorAsState(
+        targetValue = if (isDropTargetActive) AuraWhite else AuraCardBorder,
+        animationSpec = tween(180),
+        label = "viewportBorder"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (isDropTargetActive) 2.dp else 1.dp,
+        animationSpec = tween(180),
+        label = "viewportBorderWidth"
+    )
+    val dropScale by animateFloatAsState(
+        targetValue = if (isDropTargetActive) 1.015f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
+        label = "viewportDropScale"
+    )
+
+    // The "slide to compare" hint only needs to be seen once per result.
+    var showCompareHint by remember(resultBitmap) { mutableStateOf(true) }
+    LaunchedEffect(resultBitmap) {
+        if (resultBitmap != null) {
+            delay(3600)
+            showCompareHint = false
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(32.dp))
+            .graphicsLayer {
+                scaleX = dropScale
+                scaleY = dropScale
+            }
+            .clip(AuraShape.Hero)
             .background(AuraCardDark)
-            .border(borderWidth, borderColor, RoundedCornerShape(32.dp))
+            .border(borderWidth, borderColor, AuraShape.Hero)
             .testTag("before_after_viewport"),
         contentAlignment = Alignment.Center
     ) {
         if (originalBitmap == null) {
-            // Empty State (Selfie Upload or Camera capture)
             EmptySelfiePrompt(
                 onPickImage = onPickImage,
                 onCaptureImage = onCaptureImage
             )
         } else {
-            // Interactive Display
             val activeBitmap = when {
                 resultBitmap != null -> resultBitmap
                 isLivePreviewEnabled && livePreviewBitmap != null -> livePreviewBitmap
@@ -113,157 +162,148 @@ fun BeforeAfterViewport(
             }
 
             if (resultBitmap != null && !isProcessing) {
-                // Interactive Before / After Split Slider for AI Result
                 SplitComparisonView(
                     originalBitmap = originalBitmap,
                     resultBitmap = resultBitmap
                 )
             } else {
-                // Display Live Real-Time Preview or Original
                 Image(
                     bitmap = activeBitmap.asImageBitmap(),
                     contentDescription = "Portrait Viewport",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-
-                if (isProcessing) {
-                    ShimmerPortraitOverlay(
-                        stageMessage = stageMessage,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
             }
 
-            // Drop Target Overlay when user is dragging an item over portrait
-            if (isDropTargetActive) {
+            // Processing overlay fades in/out instead of popping.
+            AnimatedVisibility(
+                visible = isProcessing,
+                enter = fadeIn(tween(220)),
+                exit = fadeOut(tween(260))
+            ) {
+                ShimmerPortraitOverlay(
+                    stageMessage = stageMessage,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // Drop target: dim the photo, mark the corners, show a single clear label.
+            AnimatedVisibility(
+                visible = isDropTargetActive,
+                enter = fadeIn(tween(160)) + scaleIn(initialScale = 0.96f, animationSpec = tween(200)),
+                exit = fadeOut(tween(120))
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.55f)),
+                        .drawBehind {
+                            drawRect(Color.Black.copy(alpha = 0.5f))
+                            drawCornerBrackets(
+                                color = Color.White,
+                                inset = 18.dp.toPx(),
+                                length = 28.dp.toPx(),
+                                strokeWidth = 3.dp.toPx()
+                            )
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(50))
                             .background(Color.White)
-                            .padding(horizontal = 18.dp, vertical = 10.dp)
+                            .padding(horizontal = 16.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "BURAYA BIRAKIN",
-                                color = Color.Black,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = Color.Black,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(7.dp))
+                        Text(
+                            text = "Rafa ekle",
+                            color = Color.Black,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
 
-            // Top-Left Resolution Tag & Compare Indicator
+            // Top-left: resolution + one-time compare hint
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Black.copy(alpha = 0.65f))
-                        .border(1.dp, AuraCardBorder, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
+                GlassChip {
                     Text(
                         text = resolution.label,
                         color = AuraWhite,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold,
+                        style = AuraTabularNums
                     )
                 }
 
-                if (resultBitmap != null && !isProcessing) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.Black.copy(alpha = 0.65f))
-                            .border(1.dp, AuraCardBorder, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Compare,
-                                contentDescription = null,
-                                tint = AuraWhite,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Kaydır",
-                                color = AuraWhite,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                AnimatedVisibility(
+                    visible = resultBitmap != null && !isProcessing && showCompareHint,
+                    enter = fadeIn() + expandHorizontally(),
+                    exit = fadeOut() + shrinkHorizontally()
+                ) {
+                    GlassChip {
+                        Icon(
+                            imageVector = Icons.Default.Compare,
+                            contentDescription = null,
+                            tint = AuraWhite,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = "Kaydırarak karşılaştır",
+                            color = AuraWhite,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
 
-            // Top-Right: Visual Aura Quality Badge Overlay (Requirement 4: 1 + 2 format)
+            // Top-right: photo quality
             qualityAssessment?.let { assessment ->
-                Box(
+                GlassChip(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color.Black.copy(alpha = 0.72f))
-                        .border(1.dp, AuraWhite.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
                         .testTag("aura_quality_badge_overlay")
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (assessment.isWarning) Color(0xFFFFB300) else AuraWhite)
-                        )
-                        Text(
-                            text = "AURA KALİTE: %${assessment.score}",
-                            color = AuraWhite,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.4.sp
-                        )
-                        Text(
-                            text = "•",
-                            color = AuraTextMuted,
-                            fontSize = 10.sp
-                        )
-                        Text(
-                            text = when (assessment.status) {
-                                QualityStatus.OPTIMAL -> "Mükemmel"
-                                QualityStatus.LOW_LIGHT -> "Düşük Işık"
-                                QualityStatus.OVEREXPOSED -> "Yüksek Işık"
-                                QualityStatus.BLURRY -> "Bulanık"
-                            },
-                            color = if (assessment.isWarning) Color(0xFFFFD54F) else AuraOffWhite,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (assessment.isWarning) Color(0xFFFFB300) else AuraWhite)
+                    )
+                    Text(
+                        text = "Fotoğraf %${assessment.score}",
+                        color = AuraWhite,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        style = AuraTabularNums
+                    )
+                    Text(
+                        text = when (assessment.status) {
+                            QualityStatus.OPTIMAL -> "Mükemmel"
+                            QualityStatus.LOW_LIGHT -> "Düşük ışık"
+                            QualityStatus.OVEREXPOSED -> "Yüksek ışık"
+                            QualityStatus.BLURRY -> "Bulanık"
+                        },
+                        color = if (assessment.isWarning) Color(0xFFFFD54F) else AuraTextMuted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
@@ -275,140 +315,168 @@ private fun SplitComparisonView(
     originalBitmap: Bitmap,
     resultBitmap: Bitmap
 ) {
-    var splitFraction by remember { mutableFloatStateOf(0.5f) }
+    val split = remember { Animatable(0.97f) }
+    val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
+    var isDragging by remember { mutableStateOf(false) }
     var isHoldingOriginal by remember { mutableStateOf(false) }
+
+    // One orchestrated moment: when the result lands, the divider sweeps in from the
+    // edge to the middle so the person sees what changed without touching anything.
+    LaunchedEffect(resultBitmap) {
+        split.snapTo(0.97f)
+        delay(250)
+        split.animateTo(0.5f, tween(1000, easing = FastOutSlowInEasing))
+    }
+
+    val knobScale by animateFloatAsState(
+        targetValue = if (isDragging) 1.15f else 1f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+        label = "knobScale"
+    )
+    val labelAlpha by animateFloatAsState(
+        targetValue = if (isDragging) 0.3f else 1f,
+        label = "labelAlpha"
+    )
+    val originalOverlayAlpha by animateFloatAsState(
+        targetValue = if (isHoldingOriginal) 1f else 0f,
+        animationSpec = tween(140),
+        label = "holdOriginal"
+    )
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                detectDragGestures { change, _ ->
+                detectDragGestures(
+                    onDragStart = { start ->
+                        isDragging = true
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        scope.launch { split.snapTo((start.x / size.width).coerceIn(0.05f, 0.95f)) }
+                    },
+                    onDragEnd = { isDragging = false },
+                    onDragCancel = { isDragging = false }
+                ) { change, _ ->
                     change.consume()
-                    val newFraction = (change.position.x / size.width).coerceIn(0.05f, 0.95f)
-                    splitFraction = newFraction
+                    scope.launch { split.snapTo((change.position.x / size.width).coerceIn(0.05f, 0.95f)) }
                 }
             }
             .pointerInput(Unit) {
+                // Press-and-hold shows the untouched original. The short delay keeps it from
+                // flashing every time a drag starts.
                 detectTapGestures(
                     onPress = {
-                        isHoldingOriginal = true
+                        val job = scope.launch {
+                            delay(220)
+                            isHoldingOriginal = true
+                        }
                         tryAwaitRelease()
+                        job.cancel()
                         isHoldingOriginal = false
                     }
                 )
             }
     ) {
         val widthPx = constraints.maxWidth.toFloat()
-        val heightPx = constraints.maxHeight.toFloat()
-        val dividerX = widthPx * splitFraction
 
-        if (isHoldingOriginal) {
-            Image(
-                bitmap = originalBitmap.asImageBitmap(),
-                contentDescription = "Original Portrait",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = "Orijinal Ham Selfie",
-                    color = AuraWhite,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        } else {
-            Image(
-                bitmap = resultBitmap.asImageBitmap(),
-                contentDescription = "Try-On Result",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+        Image(
+            bitmap = resultBitmap.asImageBitmap(),
+            contentDescription = "Try-On Result",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
 
-            Image(
-                bitmap = originalBitmap.asImageBitmap(),
-                contentDescription = "Original Portion",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawWithContent {
-                        clipPath(Path().apply {
-                            addRect(Rect(0f, 0f, dividerX, heightPx))
-                        }) {
-                            this@drawWithContent.drawContent()
-                        }
+        Image(
+            bitmap = originalBitmap.asImageBitmap(),
+            contentDescription = "Original Portion",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    val x = split.value * size.width
+                    clipRect(left = 0f, top = 0f, right = x, bottom = size.height) {
+                        this@drawWithContent.drawContent()
                     }
-            )
+                }
+        )
 
-            // Divider Line
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset(dividerX.roundToInt(), 0) }
-                    .width(2.dp)
-                    .height(this@BoxWithConstraints.maxHeight)
-                    .background(AuraWhite)
-            )
+        // Press-and-hold: full original on top
+        Image(
+            bitmap = originalBitmap.asImageBitmap(),
+            contentDescription = "Original Portrait",
+            contentScale = ContentScale.Crop,
+            alpha = originalOverlayAlpha,
+            modifier = Modifier.fillMaxSize()
+        )
 
-            // Draggable Knob / Handle
-            Box(
-                modifier = Modifier
-                    .offset {
-                        IntOffset(
-                            (dividerX - 18.dp.toPx()).roundToInt(),
-                            (heightPx * 0.5f - 18.dp.toPx()).roundToInt()
-                        )
-                    }
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(AuraWhite)
-                    .border(2.dp, Color.Black, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Compare,
-                    contentDescription = null,
-                    tint = Color.Black,
-                    modifier = Modifier.size(18.dp)
-                )
+        // Divider
+        Box(
+            modifier = Modifier
+                .offset { IntOffset((split.value * widthPx - 1.dp.toPx()).roundToInt(), 0) }
+                .width(2.dp)
+                .fillMaxHeight()
+                .graphicsLayer { alpha = 1f - originalOverlayAlpha }
+                .background(AuraWhite)
+        )
+
+        // Handle: two chevrons drawn directly so they stay crisp at any size
+        Box(
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        (split.value * widthPx - 20.dp.toPx()).roundToInt(),
+                        (constraints.maxHeight * 0.5f - 20.dp.toPx()).roundToInt()
+                    )
+                }
+                .graphicsLayer {
+                    scaleX = knobScale
+                    scaleY = knobScale
+                    alpha = 1f - originalOverlayAlpha
+                }
+                .size(40.dp)
+                .shadow(8.dp, CircleShape)
+                .clip(CircleShape)
+                .background(AuraWhite),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(20.dp)) {
+                val sw = 2.dp.toPx()
+                val cy = size.height / 2f
+                val a = size.width * 0.18f
+                val d = size.height * 0.2f
+                // left chevron
+                drawLine(Color.Black, Offset(size.width * 0.34f, cy - d), Offset(a + size.width * 0.16f, cy), sw, StrokeCap.Round)
+                drawLine(Color.Black, Offset(a + size.width * 0.16f, cy), Offset(size.width * 0.34f, cy + d), sw, StrokeCap.Round)
+                // right chevron
+                drawLine(Color.Black, Offset(size.width * 0.66f, cy - d), Offset(size.width - a - size.width * 0.16f, cy), sw, StrokeCap.Round)
+                drawLine(Color.Black, Offset(size.width - a - size.width * 0.16f, cy), Offset(size.width * 0.66f, cy + d), sw, StrokeCap.Round)
             }
+        }
 
-            // Labels: ÖNCE & SONRA (AURA)
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "ÖNCE",
-                    color = AuraWhite,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-
-                Text(
-                    text = "SONRA (AURA)",
-                    color = AuraWhite,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
+        // Side labels
+        GlassChip(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp)
+                .graphicsLayer { alpha = labelAlpha * (1f - originalOverlayAlpha) }
+        ) {
+            Text(text = "Önce", color = AuraWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        }
+        GlassChip(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .graphicsLayer { alpha = labelAlpha * (1f - originalOverlayAlpha) }
+        ) {
+            Text(text = "Sonra", color = AuraWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        }
+        GlassChip(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+                .graphicsLayer { alpha = originalOverlayAlpha }
+        ) {
+            Text(text = "Orijinal fotoğraf", color = AuraWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

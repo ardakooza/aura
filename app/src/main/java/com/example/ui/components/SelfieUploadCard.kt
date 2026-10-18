@@ -44,6 +44,16 @@ import com.example.ui.theme.AuraSurfaceElevated
 import com.example.ui.theme.AuraTextMuted
 import com.example.ui.theme.AuraWhite
 import com.example.util.QualityAssessment
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontFamily
 
 @Composable
 fun SelfieUploadCard(
@@ -58,13 +68,31 @@ fun SelfieUploadCard(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         if (!hasPortrait) {
-            // Clean B&W Selfie Intake Container
+            // Intake container: a dashed edge reads as "drop something here"; the dashes drift slowly.
+            val dashTransition = rememberInfiniteTransition(label = "intakeDash")
+            val dashPhase by dashTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 48f,
+                animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
+                label = "dashPhase"
+            )
+            val breathe by dashTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 1.06f,
+                animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "breathe"
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(AuraShape.Hero)
                     .background(AuraCardDark)
-                    .border(1.dp, AuraCardBorder, RoundedCornerShape(28.dp))
+                    .dashedBorder(
+                        color = AuraCardBorder.copy(alpha = 0.9f),
+                        cornerRadius = 32.dp,
+                        strokeWidth = 1.5.dp,
+                        phase = { dashPhase }
+                    )
                     .padding(24.dp)
                     .testTag("selfie_upload_card")
             ) {
@@ -75,6 +103,10 @@ fun SelfieUploadCard(
                     Box(
                         modifier = Modifier
                             .size(68.dp)
+                            .graphicsLayer {
+                                scaleX = breathe
+                                scaleY = breathe
+                            }
                             .clip(CircleShape)
                             .background(AuraSurfaceElevated)
                             .border(1.dp, AuraCardBorder, CircleShape),
@@ -91,16 +123,17 @@ fun SelfieUploadCard(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Selfie veya Portre Yükle",
+                        text = "Bir selfie ekleyin",
                         color = AuraWhite,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Serif
                     )
 
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = "Doğal yüz hatlarınızı ve ışıklandırmanızı koruyarak 3D gözlük ve saç modellerini milimetrik olarak yerleştirir.",
+                        text = "Gözlük, şapka ve saç modellerini yüzünüzde deneyin. Yüz hatlarınız ve ışık korunur.",
                         color = AuraTextMuted,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center,
@@ -120,7 +153,7 @@ fun SelfieUploadCard(
                                 containerColor = AuraWhite,
                                 contentColor = Color.Black
                             ),
-                            shape = RoundedCornerShape(20.dp),
+                            shape = AuraShape.Control,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(46.dp)
@@ -133,8 +166,8 @@ fun SelfieUploadCard(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Selfie Çek",
-                                fontWeight = FontWeight.Bold,
+                                text = "Selfie çek",
+                                fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )
                         }
@@ -142,7 +175,7 @@ fun SelfieUploadCard(
                         OutlinedButton(
                             onClick = onPickImage,
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = AuraWhite),
-                            shape = RoundedCornerShape(20.dp),
+                            shape = AuraShape.Control,
                             border = androidx.compose.foundation.BorderStroke(1.dp, AuraCardBorder),
                             modifier = Modifier
                                 .weight(1f)

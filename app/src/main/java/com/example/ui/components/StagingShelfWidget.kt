@@ -53,6 +53,9 @@ import com.example.ui.theme.AuraPillInactive
 import com.example.ui.theme.AuraSurfaceElevated
 import com.example.ui.theme.AuraTextMuted
 import com.example.ui.theme.AuraWhite
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 
 @Composable
 fun StagingShelfWidget(
@@ -71,9 +74,9 @@ fun StagingShelfWidget(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
+            .clip(AuraShape.Card)
             .background(AuraCardDark)
-            .border(1.dp, AuraCardBorder, RoundedCornerShape(26.dp))
+            .border(1.dp, AuraCardBorder, AuraShape.Card)
             .padding(16.dp)
             .testTag("staging_shelf_widget")
     ) {
@@ -93,11 +96,10 @@ fun StagingShelfWidget(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "DENEME RAFI",
+                        text = "Deneme rafı",
                         color = AuraWhite,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(
@@ -107,7 +109,7 @@ fun StagingShelfWidget(
                             .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "${stagedItems.size} Parça",
+                            text = "${stagedItems.size} parça",
                             color = AuraTextMuted,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
@@ -117,7 +119,7 @@ fun StagingShelfWidget(
 
                 if (stagedItems.isNotEmpty()) {
                     Text(
-                        text = "Rafı Boşalt",
+                        text = "Rafı boşalt",
                         color = AuraTextMuted,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
@@ -142,7 +144,7 @@ fun StagingShelfWidget(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Aşağıdaki raflardan denemek istediğiniz 3D parçaları seçin",
+                        text = "Aşağıdaki raftan parça seçin",
                         color = AuraTextMuted,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Normal
@@ -157,7 +159,8 @@ fun StagingShelfWidget(
                     items(stagedItems.toList(), key = { it.id }) { item ->
                         StagedItemChip(
                             item = item,
-                            onRemove = { onRemoveItem(item) }
+                            onRemove = { onRemoveItem(item) },
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }
@@ -165,77 +168,42 @@ fun StagingShelfWidget(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Model Tier & Resolution Controls Row
+            // Model tier + output resolution
+            val tiers = AIModelTier.values()
+            val resolutions = ImageResolution.values()
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Dual Model Selector (Flash vs Pro)
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(AuraPillInactive)
-                        .border(1.dp, AuraCardBorder, RoundedCornerShape(18.dp))
-                        .padding(2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    AIModelTier.values().forEach { tier ->
-                        val isSelected = tier == selectedModelTier
-                        val bg by animateColorAsState(if (isSelected) AuraWhite else Color.Transparent, label = "modelBg")
-                        val txt by animateColorAsState(if (isSelected) Color.Black else AuraTextMuted, label = "modelTxt")
+                AuraSegmentedControl(
+                    options = tiers.map { tier ->
+                        SegmentOption(
+                            label = when (tier) {
+                                AIModelTier.FLASH_IMAGE -> "Hızlı"
+                                AIModelTier.PRO_IMAGE -> "Pro"
+                            },
+                            testTag = "model_tier_${tier.name.lowercase()}"
+                        )
+                    },
+                    selectedIndex = tiers.indexOf(selectedModelTier).coerceAtLeast(0),
+                    onSelect = { onSelectModelTier(tiers[it]) },
+                    modifier = Modifier.weight(1f),
+                    height = 36.dp
+                )
 
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(bg)
-                                .clickable { onSelectModelTier(tier) }
-                                .padding(horizontal = 8.dp, vertical = 5.dp)
-                                .testTag("model_tier_${tier.name.lowercase()}"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = tier.title,
-                                color = txt,
-                                fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-
-                // Resolution Selector (1K / 2K / 4K)
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(AuraPillInactive)
-                        .border(1.dp, AuraCardBorder, RoundedCornerShape(18.dp))
-                        .padding(2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    ImageResolution.values().forEach { res ->
-                        val isSelected = res == selectedResolution
-                        val bg by animateColorAsState(if (isSelected) AuraWhite else Color.Transparent, label = "resBg")
-                        val txt by animateColorAsState(if (isSelected) Color.Black else AuraTextMuted, label = "resTxt")
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(bg)
-                                .clickable { onSelectResolution(res) }
-                                .padding(horizontal = 8.dp, vertical = 5.dp)
-                                .testTag("res_pill_${res.label.lowercase()}"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = res.label,
-                                color = txt,
-                                fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        }
-                    }
-                }
+                AuraSegmentedControl(
+                    options = resolutions.map { res ->
+                        SegmentOption(
+                            label = res.label,
+                            testTag = "res_pill_${res.label.lowercase()}"
+                        )
+                    },
+                    selectedIndex = resolutions.indexOf(selectedResolution).coerceAtLeast(0),
+                    onSelect = { onSelectResolution(resolutions[it]) },
+                    modifier = Modifier.weight(1.25f),
+                    height = 36.dp
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -250,10 +218,10 @@ fun StagingShelfWidget(
                     disabledContainerColor = AuraPillInactive,
                     disabledContentColor = AuraTextMuted
                 ),
-                shape = RoundedCornerShape(20.dp),
+                shape = AuraShape.Control,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(50.dp)
                     .testTag("batch_generate_button")
             ) {
                 Icon(
@@ -262,11 +230,17 @@ fun StagingShelfWidget(
                     modifier = Modifier.size(17.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isProcessing) "İşleniyor..." else "Üret ve Puanla (${stagedItems.size} Parça)",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+                AnimatedContent(
+                    targetState = isProcessing,
+                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+                    label = "generateLabel"
+                ) { processing ->
+                    Text(
+                        text = if (processing) "Oluşturuluyor…" else "Oluştur ve puanla (${stagedItems.size})",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                }
             }
         }
     }
@@ -275,10 +249,11 @@ fun StagingShelfWidget(
 @Composable
 private fun StagedItemChip(
     item: CatalogItem,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .background(AuraSurfaceElevated)
             .border(1.dp, AuraCardBorder, RoundedCornerShape(16.dp))

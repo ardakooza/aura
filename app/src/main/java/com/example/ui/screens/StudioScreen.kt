@@ -67,6 +67,12 @@ import com.example.ui.components.StagingShelfWidget
 import com.example.ui.theme.AuraCardBorder
 import com.example.ui.theme.AuraWhite
 import kotlin.math.roundToInt
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.material.icons.filled.Style
+import androidx.compose.ui.graphics.graphicsLayer
 
 @Composable
 fun StudioScreen(
@@ -162,7 +168,7 @@ fun StudioScreen(
                 // Initial state is hidden, smoothly animates into view once objects are added/dragged
                 AnimatedVisibility(
                     visible = state.stagedItems.isNotEmpty(),
-                    enter = fadeIn() + expandVertically(),
+                    enter = fadeIn() + expandVertically(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)),
                     exit = fadeOut() + shrinkVertically()
                 ) {
                     StagingShelfWidget(
@@ -239,6 +245,15 @@ fun StudioScreen(
         // Floating Drag Ghost Preview
         val item = draggingItem
         if (item != null) {
+            val ghostScale by animateFloatAsState(
+                targetValue = if (isOverPortrait) 1.1f else 1f,
+                animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+                label = "ghostScale"
+            )
+            val ghostBorder by animateColorAsState(
+                targetValue = if (isOverPortrait) AuraWhite else AuraCardBorder,
+                label = "ghostBorder"
+            )
             Box(
                 modifier = Modifier
                     .offset {
@@ -247,14 +262,23 @@ fun StudioScreen(
                             (dragPositionInWindow.y - 70.dp.toPx()).roundToInt()
                         )
                     }
-                    .shadow(12.dp, CircleShape)
+                    .graphicsLayer {
+                        scaleX = ghostScale
+                        scaleY = ghostScale
+                        rotationZ = if (isOverPortrait) 0f else -3f
+                    }
+                    .shadow(16.dp, RoundedCornerShape(20.dp))
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF1C1C20).copy(alpha = 0.94f))
-                    .border(1.5.dp, if (isOverPortrait) AuraWhite else AuraCardBorder, RoundedCornerShape(20.dp))
+                    .background(Color(0xFF1C1C20).copy(alpha = 0.96f))
+                    .border(1.5.dp, ghostBorder, RoundedCornerShape(20.dp))
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val icon = if (item.category == ItemCategory.EYEWEAR) Icons.Default.Visibility else Icons.Default.FaceRetouchingNatural
+                    val icon = when (item.category) {
+                        ItemCategory.EYEWEAR -> Icons.Default.Visibility
+                        ItemCategory.HAIRSTYLES -> Icons.Default.FaceRetouchingNatural
+                        ItemCategory.HEADWEAR -> Icons.Default.Style
+                    }
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
@@ -266,7 +290,7 @@ fun StudioScreen(
                         text = item.name,
                         color = AuraWhite,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
