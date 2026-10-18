@@ -310,7 +310,7 @@ object AuraAiEngine {
         )
     }
 
-    private fun compositeItemsLocally(original: Bitmap, items: List<CatalogItem>): Bitmap {
+    fun compositeItemsLocally(original: Bitmap, items: List<CatalogItem>): Bitmap {
         val result = original.copy(Bitmap.Config.ARGB_8888, true)
         val canvas = Canvas(result)
         val w = result.width.toFloat()
@@ -321,15 +321,22 @@ object AuraAiEngine {
         val rightEyeX = w * 0.60f
         val noseBridgeX = w * 0.50f
         val foreheadY = h * 0.25f
-        val headTopY = h * 0.15f
+        val headTopY = h * 0.14f
         val neckY = h * 0.58f
         val shoulderY = h * 0.72f
 
-        for (item in items) {
-            when (item.category) {
-                ItemCategory.EYEWEAR -> drawEyewearItem(canvas, item, w, h, eyeCenterY, leftEyeX, rightEyeX, noseBridgeX)
-                ItemCategory.HAIRSTYLES -> drawHairstyleItem(canvas, item, w, h, foreheadY, headTopY)
-            }
+        // Natural order of real physical try-on:
+        // 1. Hair background & body
+        for (item in items.filter { it.category == ItemCategory.HAIRSTYLES }) {
+            drawHairstyleItem(canvas, item, w, h, foreheadY, headTopY)
+        }
+        // 2. Eyewear on the facial bridge
+        for (item in items.filter { it.category == ItemCategory.EYEWEAR }) {
+            drawEyewearItem(canvas, item, w, h, eyeCenterY, leftEyeX, rightEyeX, noseBridgeX)
+        }
+        // 3. Headwear on the crown & forehead (with cast shadow over upper face)
+        for (item in items.filter { it.category == ItemCategory.HEADWEAR }) {
+            drawHeadwearItem(canvas, item, w, h, foreheadY, headTopY)
         }
 
         return result
@@ -345,28 +352,48 @@ object AuraAiEngine {
         rightEyeX: Float,
         noseBridgeX: Float
     ) {
+        val isSportShield = item.id == "eye_oakley_sports" || item.id == "eye_balenciaga_shield"
+        val isSlim = item.id == "eye_neo_slim_futuristic"
+        val isCatEye = item.id == "eye_prada_cateye"
+        val isClubmaster = item.id == "eye_clubmaster_gold"
+        val isRimless = item.id == "eye_cartier_rimless"
+        val isRound = item.id == "eye_op_round"
+        val isOcta = item.id == "eye_matsuda_octa"
+        val isAviator = item.id == "eye_tf_aviator"
+
         val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = when (item.id) {
-                "eye_aviator" -> Color.rgb(225, 225, 230)
-                "eye_wireframe" -> Color.rgb(210, 210, 220)
-                "eye_round_vintage" -> Color.rgb(50, 40, 32)
-                else -> Color.rgb(20, 20, 22)
+            color = when {
+                item.id == "eye_cartier_rimless" || isClubmaster -> Color.rgb(212, 175, 55) // Gold
+                item.id == "eye_matsuda_octa" -> Color.rgb(215, 218, 222) // Handcrafted silver
+                item.id == "eye_tf_aviator" -> Color.rgb(180, 185, 190) // Brushed titanium
+                item.id == "eye_oakley_sports" -> Color.rgb(245, 245, 250) // Matte white sport
+                item.id == "eye_op_round" -> Color.rgb(90, 52, 28) // Amber tortoiseshell
+                else -> Color.rgb(18, 18, 20) // Deep gloss/matte black
             }
             style = Paint.Style.STROKE
-            strokeWidth = if (item.id == "eye_wireframe") 3.5f else 7f
+            strokeWidth = when {
+                isRimless -> 2.5f
+                isOcta -> 3.5f
+                isSlim -> 3.0f
+                item.id == "eye_gm_bold" || item.id == "eye_gucci_oversized" || isCatEye -> 8.5f
+                else -> 6f
+            }
         }
 
         val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(40, 0, 0, 0)
+            color = Color.argb(45, 0, 0, 0)
             style = Paint.Style.STROKE
             strokeWidth = 10f
         }
 
         val lensPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = when (item.id) {
-                "eye_dark_shades" -> Color.argb(225, 12, 12, 15)
-                "eye_cyber_rimless" -> Color.argb(170, 20, 20, 24)
-                else -> Color.argb(45, 240, 245, 255)
+            color = when {
+                isRimless -> Color.argb(35, 220, 235, 255) // Clear prescription antireflective
+                item.id == "eye_oakley_sports" -> Color.argb(200, 230, 55, 30) // Prizm road red-orange
+                item.id == "eye_balenciaga_shield" -> Color.argb(210, 195, 205, 215) // Mirrored chrome
+                item.id == "eye_tf_aviator" -> Color.argb(195, 25, 30, 38) // Polarized smoke
+                item.id == "eye_op_round" -> Color.argb(40, 240, 245, 255) // Clear optical
+                else -> Color.argb(225, 14, 14, 16) // Pitch black polarized
             }
             style = Paint.Style.FILL
         }
@@ -377,54 +404,164 @@ object AuraAiEngine {
             style = Paint.Style.STROKE
         }
 
-        val lensWidth = w * 0.16f
-        val lensHeight = if (item.id == "eye_dark_shades") w * 0.09f else w * 0.13f
+        if (isSportShield) {
+            // One-piece continuous aerodynamic shield
+            val shieldPath = Path().apply {
+                moveTo(w * 0.28f, eyeY - 14f)
+                cubicTo(w * 0.40f, eyeY - 20f, w * 0.60f, eyeY - 20f, w * 0.72f, eyeY - 14f)
+                cubicTo(w * 0.76f, eyeY + 28f, w * 0.58f, eyeY + 36f, w * 0.50f, eyeY + 28f)
+                cubicTo(w * 0.42f, eyeY + 36f, w * 0.24f, eyeY + 28f, w * 0.28f, eyeY - 14f)
+                close()
+            }
+            canvas.drawPath(shieldPath, shadowPaint)
+            canvas.drawPath(shieldPath, lensPaint)
+            // Upper brow frame
+            val browPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = framePaint.color
+                style = Paint.Style.STROKE
+                strokeWidth = 6.5f
+            }
+            val browPath = Path().apply {
+                moveTo(w * 0.26f, eyeY - 12f)
+                cubicTo(w * 0.40f, eyeY - 22f, w * 0.60f, eyeY - 22f, w * 0.74f, eyeY - 12f)
+            }
+            canvas.drawPath(browPath, browPaint)
+            canvas.drawLine(w * 0.32f, eyeY - 8f, w * 0.42f, eyeY + 18f, reflectionPaint)
+            return
+        }
 
-        // Cast shadow
-        canvas.drawRoundRect(RectF(leftEyeX - lensWidth * 0.6f + 3f, eyeY - lensHeight * 0.5f + 4f, leftEyeX + lensWidth * 0.6f + 3f, eyeY + lensHeight * 0.5f + 4f), 16f, 16f, shadowPaint)
-        canvas.drawRoundRect(RectF(rightEyeX - lensWidth * 0.6f + 3f, eyeY - lensHeight * 0.5f + 4f, rightEyeX + lensWidth * 0.6f + 3f, eyeY + lensHeight * 0.5f + 4f), 16f, 16f, shadowPaint)
+        val lensWidth = when {
+            item.id == "eye_gucci_oversized" -> w * 0.18f
+            isSlim -> w * 0.14f
+            else -> w * 0.155f
+        }
+        val lensHeight = when {
+            isSlim -> w * 0.07f
+            item.id == "eye_gucci_oversized" -> w * 0.16f
+            isCatEye -> w * 0.11f
+            else -> w * 0.13f
+        }
 
-        // Left Lens
-        val leftRect = RectF(leftEyeX - lensWidth * 0.6f, eyeY - lensHeight * 0.5f, leftEyeX + lensWidth * 0.6f, eyeY + lensHeight * 0.5f)
-        canvas.drawRoundRect(leftRect, if (item.id == "eye_round_vintage") lensWidth else 16f, if (item.id == "eye_round_vintage") lensHeight else 16f, lensPaint)
-        canvas.drawRoundRect(leftRect, if (item.id == "eye_round_vintage") lensWidth else 16f, if (item.id == "eye_round_vintage") lensHeight else 16f, framePaint)
-        canvas.drawLine(leftRect.left + 8f, leftRect.top + 8f, leftRect.left + 24f, leftRect.bottom - 8f, reflectionPaint)
+        val leftRect = RectF(leftEyeX - lensWidth * 0.55f, eyeY - lensHeight * 0.5f, leftEyeX + lensWidth * 0.55f, eyeY + lensHeight * 0.5f)
+        val rightRect = RectF(rightEyeX - lensWidth * 0.55f, eyeY - lensHeight * 0.5f, rightEyeX + lensWidth * 0.55f, eyeY + lensHeight * 0.5f)
 
-        // Right Lens
-        val rightRect = RectF(rightEyeX - lensWidth * 0.6f, eyeY - lensHeight * 0.5f, rightEyeX + lensWidth * 0.6f, eyeY + lensHeight * 0.5f)
-        canvas.drawRoundRect(rightRect, if (item.id == "eye_round_vintage") lensWidth else 16f, if (item.id == "eye_round_vintage") lensHeight else 16f, lensPaint)
-        canvas.drawRoundRect(rightRect, if (item.id == "eye_round_vintage") lensWidth else 16f, if (item.id == "eye_round_vintage") lensHeight else 16f, framePaint)
-        canvas.drawLine(rightRect.left + 8f, rightRect.top + 8f, rightRect.left + 24f, rightRect.bottom - 8f, reflectionPaint)
+        // Drop shadow on face for realistic contact ambient occlusion
+        canvas.drawRoundRect(RectF(leftRect.left + 3f, leftRect.top + 5f, leftRect.right + 3f, leftRect.bottom + 5f), 18f, 18f, shadowPaint)
+        canvas.drawRoundRect(RectF(rightRect.left + 3f, rightRect.top + 5f, rightRect.right + 3f, rightRect.bottom + 5f), 18f, 18f, shadowPaint)
 
-        // Nose Bridge
+        val cornerRadius = when {
+            isRound -> lensWidth * 0.5f
+            isOcta -> 26f
+            isCatEye -> 12f
+            else -> 18f
+        }
+
+        // Draw lenses
+        canvas.drawRoundRect(leftRect, cornerRadius, cornerRadius, lensPaint)
+        canvas.drawRoundRect(rightRect, cornerRadius, cornerRadius, lensPaint)
+
+        // Draw frames
+        if (isCatEye) {
+            // Draw dramatic cat-eye wing upwards on corners
+            val leftCatPath = Path().apply {
+                moveTo(leftRect.left - 8f, leftRect.top - 12f)
+                lineTo(leftRect.right, leftRect.top)
+                lineTo(leftRect.right, leftRect.bottom)
+                lineTo(leftRect.left, leftRect.bottom)
+                close()
+            }
+            val rightCatPath = Path().apply {
+                moveTo(rightRect.left, rightRect.top)
+                lineTo(rightRect.right + 8f, rightRect.top - 12f)
+                lineTo(rightRect.right, rightRect.bottom)
+                lineTo(rightRect.left, rightRect.bottom)
+                close()
+            }
+            canvas.drawPath(leftCatPath, framePaint)
+            canvas.drawPath(rightCatPath, framePaint)
+        } else {
+            canvas.drawRoundRect(leftRect, cornerRadius, cornerRadius, framePaint)
+            canvas.drawRoundRect(rightRect, cornerRadius, cornerRadius, framePaint)
+        }
+
+        // Specular reflections
+        canvas.drawLine(leftRect.left + 8f, leftRect.top + 8f, leftRect.left + 22f, leftRect.bottom - 8f, reflectionPaint)
+        canvas.drawLine(rightRect.left + 8f, rightRect.top + 8f, rightRect.left + 22f, rightRect.bottom - 8f, reflectionPaint)
+
+        // Bridge
         canvas.drawLine(leftRect.right, eyeY - 2f, rightRect.left, eyeY - 2f, framePaint)
-        if (item.id == "eye_aviator") {
+        if (isAviator) {
+            // Double bridge top bar
             canvas.drawLine(leftRect.right - 2f, eyeY - 14f, rightRect.left + 2f, eyeY - 14f, framePaint)
         }
 
-        // Temples
-        canvas.drawLine(leftRect.left, eyeY, leftRect.left - w * 0.08f, eyeY - 4f, framePaint)
-        canvas.drawLine(rightRect.right, eyeY, rightRect.right + w * 0.08f, eyeY - 4f, framePaint)
+        // Temples towards ears
+        canvas.drawLine(leftRect.left, eyeY - 2f, leftRect.left - w * 0.08f, eyeY - 6f, framePaint)
+        canvas.drawLine(rightRect.right, eyeY - 2f, rightRect.right + w * 0.08f, eyeY - 6f, framePaint)
     }
 
     private fun drawHeadwearItem(canvas: Canvas, item: CatalogItem, w: Float, h: Float, foreheadY: Float, headTopY: Float) {
         val hatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = when (item.id) {
-                "head_beanie" -> Color.rgb(30, 30, 34)
-                "head_bucket" -> Color.rgb(18, 18, 20)
-                "head_fedora" -> Color.rgb(14, 14, 16)
+                "head_yankees_baseball" -> Color.rgb(20, 20, 24)
+                "head_borsalino_fedora" -> Color.rgb(55, 36, 26) // Tobacco brown felt
+                "head_fisherman_beanie" -> Color.rgb(38, 42, 48) // Charcoal wool
+                "head_prada_bucket" -> Color.rgb(15, 15, 18) // Gloss black re-nylon
+                "head_french_beret" -> Color.rgb(108, 18, 32) // Burgundy wool
+                "head_jacquemus_straw" -> Color.rgb(222, 190, 132) // Golden straw
+                "head_techwear_visor" -> Color.rgb(25, 28, 32) // Carbon tactical
                 else -> Color.rgb(22, 22, 24)
             }
             style = Paint.Style.FILL
         }
 
         val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(70, 0, 0, 0)
+            color = Color.argb(85, 0, 0, 0)
             style = Paint.Style.FILL
         }
 
         when (item.id) {
-            "head_beanie" -> {
+            "head_yankees_baseball" -> {
+                // Crown hugging cranium
+                val crownPath = Path().apply {
+                    moveTo(w * 0.27f, foreheadY)
+                    cubicTo(w * 0.28f, headTopY - 25f, w * 0.72f, headTopY - 25f, w * 0.73f, foreheadY)
+                    close()
+                }
+                canvas.drawPath(crownPath, hatPaint)
+                // Curved visor
+                val visorRect = RectF(w * 0.28f, foreheadY - 6f, w * 0.72f, foreheadY + 28f)
+                canvas.drawRoundRect(visorRect, 18f, 18f, hatPaint)
+                // Ambient cast shadow on forehead and brow
+                canvas.drawRoundRect(RectF(w * 0.30f, foreheadY + 16f, w * 0.70f, foreheadY + 36f), 12f, 12f, shadowPaint)
+                // Top button
+                val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(40, 40, 48)
+                }
+                canvas.drawCircle(w * 0.50f, headTopY - 22f, 6f, buttonPaint)
+            }
+            "head_borsalino_fedora" -> {
+                // Wide undulating brim
+                val brimRect = RectF(w * 0.16f, foreheadY - 14f, w * 0.84f, foreheadY + 26f)
+                canvas.drawOval(brimRect, hatPaint)
+                // Ambient shadow over brow
+                canvas.drawOval(RectF(w * 0.22f, foreheadY + 14f, w * 0.78f, foreheadY + 38f), shadowPaint)
+                // Pinched crown
+                val crownPath = Path().apply {
+                    moveTo(w * 0.32f, foreheadY - 6f)
+                    cubicTo(w * 0.34f, headTopY - 32f, w * 0.66f, headTopY - 32f, w * 0.68f, foreheadY - 6f)
+                    close()
+                }
+                canvas.drawPath(crownPath, hatPaint)
+                // Grograin ribbon band
+                val bandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(28, 18, 14)
+                    strokeWidth = 9f
+                    style = Paint.Style.STROKE
+                }
+                canvas.drawLine(w * 0.32f, foreheadY - 8f, w * 0.68f, foreheadY - 8f, bandPaint)
+            }
+            "head_fisherman_beanie" -> {
                 val beaniePath = Path().apply {
                     moveTo(w * 0.28f, foreheadY)
                     cubicTo(w * 0.24f, headTopY - 30f, w * 0.76f, headTopY - 30f, w * 0.72f, foreheadY)
@@ -433,37 +570,79 @@ object AuraAiEngine {
                     close()
                 }
                 canvas.drawPath(beaniePath, hatPaint)
+                // Turn-up fold cuff
+                val cuffPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(48, 52, 60)
+                }
+                canvas.drawRoundRect(RectF(w * 0.27f, foreheadY - 4f, w * 0.73f, foreheadY + 22f), 8f, 8f, cuffPaint)
                 val ribPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.rgb(44, 44, 50)
+                    color = Color.rgb(32, 34, 38)
                     strokeWidth = 2.5f
                 }
                 for (step in 1..8) {
                     val x = w * (0.30f + step * 0.048f)
-                    canvas.drawLine(x, headTopY, x, foreheadY + 20f, ribPaint)
+                    canvas.drawLine(x, headTopY - 10f, x, foreheadY + 20f, ribPaint)
                 }
             }
-            "head_bucket" -> {
+            "head_prada_bucket" -> {
                 val crownPath = Path().apply {
-                    moveTo(w * 0.32f, foreheadY - 10f)
-                    lineTo(w * 0.36f, headTopY)
-                    lineTo(w * 0.64f, headTopY)
-                    lineTo(w * 0.68f, foreheadY - 10f)
+                    moveTo(w * 0.31f, foreheadY - 12f)
+                    lineTo(w * 0.35f, headTopY - 18f)
+                    lineTo(w * 0.65f, headTopY - 18f)
+                    lineTo(w * 0.69f, foreheadY - 12f)
                     close()
                 }
                 canvas.drawPath(crownPath, hatPaint)
-                val brimRect = RectF(w * 0.24f, foreheadY - 14f, w * 0.76f, foreheadY + 32f)
+                val brimRect = RectF(w * 0.22f, foreheadY - 16f, w * 0.78f, foreheadY + 34f)
                 canvas.drawOval(brimRect, hatPaint)
-                canvas.drawRect(RectF(w * 0.30f, foreheadY + 20f, w * 0.70f, foreheadY + 36f), shadowPaint)
+                canvas.drawRect(RectF(w * 0.28f, foreheadY + 20f, w * 0.72f, foreheadY + 38f), shadowPaint)
             }
-            "head_fedora" -> {
-                val brimRect = RectF(w * 0.18f, foreheadY - 10f, w * 0.82f, foreheadY + 25f)
-                canvas.drawOval(brimRect, hatPaint)
+            "head_french_beret" -> {
+                // Parisian tilted beret
+                val beretPath = Path().apply {
+                    moveTo(w * 0.26f, foreheadY + 5f)
+                    cubicTo(w * 0.18f, headTopY - 20f, w * 0.70f, headTopY - 45f, w * 0.82f, foreheadY - 10f)
+                    cubicTo(w * 0.80f, foreheadY + 15f, w * 0.40f, foreheadY + 18f, w * 0.26f, foreheadY + 5f)
+                    close()
+                }
+                canvas.drawPath(beretPath, hatPaint)
+                // Center stalk
+                val stalkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(75, 10, 20)
+                    strokeWidth = 3f
+                }
+                canvas.drawLine(w * 0.52f, headTopY - 32f, w * 0.54f, headTopY - 42f, stalkPaint)
+            }
+            "head_jacquemus_straw" -> {
+                // Wide undulating straw brim
+                val strawBrim = RectF(w * 0.10f, foreheadY - 22f, w * 0.90f, foreheadY + 36f)
+                canvas.drawOval(strawBrim, hatPaint)
+                // Warm shade under brim
+                canvas.drawOval(RectF(w * 0.16f, foreheadY + 15f, w * 0.84f, foreheadY + 45f), shadowPaint)
                 val crownPath = Path().apply {
-                    moveTo(w * 0.34f, foreheadY)
-                    cubicTo(w * 0.36f, headTopY - 20f, w * 0.64f, headTopY - 20f, w * 0.66f, foreheadY)
+                    moveTo(w * 0.32f, foreheadY - 15f)
+                    cubicTo(w * 0.35f, headTopY - 25f, w * 0.65f, headTopY - 25f, w * 0.68f, foreheadY - 15f)
                     close()
                 }
                 canvas.drawPath(crownPath, hatPaint)
+            }
+            "head_techwear_visor" -> {
+                val capPath = Path().apply {
+                    moveTo(w * 0.28f, foreheadY)
+                    cubicTo(w * 0.29f, headTopY - 20f, w * 0.71f, headTopY - 20f, w * 0.72f, foreheadY)
+                    close()
+                }
+                canvas.drawPath(capPath, hatPaint)
+                val visorRect = RectF(w * 0.28f, foreheadY - 4f, w * 0.72f, foreheadY + 26f)
+                canvas.drawRoundRect(visorRect, 16f, 16f, hatPaint)
+                // Neon cyan trim line
+                val neonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(0, 235, 255)
+                    strokeWidth = 3f
+                    style = Paint.Style.STROKE
+                }
+                canvas.drawRoundRect(RectF(w * 0.30f, foreheadY + 18f, w * 0.70f, foreheadY + 24f), 8f, 8f, neonPaint)
+                canvas.drawRoundRect(RectF(w * 0.32f, foreheadY + 22f, w * 0.68f, foreheadY + 38f), 10f, 10f, shadowPaint)
             }
             else -> {
                 val capPath = Path().apply {
@@ -481,11 +660,19 @@ object AuraAiEngine {
 
     private fun drawHairstyleItem(canvas: Canvas, item: CatalogItem, w: Float, h: Float, foreheadY: Float, headTopY: Float) {
         val hairPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(20, 18, 18)
+            color = when (item.id) {
+                "hair_platinum_lob" -> Color.rgb(228, 226, 220) // Platinum icy blonde
+                "hair_curtain_bangs" || "hair_italian_wavy_flow" -> Color.rgb(45, 32, 24) // Rich dark espresso
+                "hair_curly_fringe" || "hair_wolf_cut" -> Color.rgb(28, 22, 18) // Natural dark brown
+                else -> Color.rgb(20, 18, 18) // Deep black
+            }
             style = Paint.Style.FILL
         }
         val hairHighlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(48, 44, 42)
+            color = when (item.id) {
+                "hair_platinum_lob" -> Color.rgb(255, 255, 250)
+                else -> Color.rgb(56, 50, 46)
+            }
             style = Paint.Style.STROKE
             strokeWidth = 3f
         }
@@ -493,31 +680,130 @@ object AuraAiEngine {
         when (item.id) {
             "hair_french_crop" -> {
                 val cropPath = Path().apply {
-                    moveTo(w * 0.28f, foreheadY)
-                    cubicTo(w * 0.26f, headTopY - 15f, w * 0.74f, headTopY - 15f, w * 0.72f, foreheadY)
-                    lineTo(w * 0.68f, foreheadY + 12f)
-                    lineTo(w * 0.32f, foreheadY + 12f)
+                    moveTo(w * 0.27f, foreheadY)
+                    cubicTo(w * 0.25f, headTopY - 20f, w * 0.75f, headTopY - 20f, w * 0.73f, foreheadY)
+                    lineTo(w * 0.70f, foreheadY + 14f)
+                    lineTo(w * 0.30f, foreheadY + 14f)
                     close()
                 }
                 canvas.drawPath(cropPath, hairPaint)
                 for (i in 0..5) {
-                    val x = w * (0.35f + i * 0.06f)
-                    canvas.drawLine(x, headTopY + 10f, x - 10f, foreheadY + 8f, hairHighlight)
+                    val x = w * (0.34f + i * 0.06f)
+                    canvas.drawLine(x, headTopY + 5f, x - 8f, foreheadY + 10f, hairHighlight)
+                }
+            }
+            "hair_low_taper" -> {
+                // Textured quiff with upward front volume
+                val quiffPath = Path().apply {
+                    moveTo(w * 0.26f, foreheadY + 10f)
+                    cubicTo(w * 0.24f, headTopY - 40f, w * 0.65f, headTopY - 45f, w * 0.74f, foreheadY + 10f)
+                    lineTo(w * 0.70f, foreheadY - 5f)
+                    cubicTo(w * 0.60f, foreheadY - 25f, w * 0.40f, foreheadY - 25f, w * 0.30f, foreheadY - 5f)
+                    close()
+                }
+                canvas.drawPath(quiffPath, hairPaint)
+                for (i in 0..6) {
+                    val x = w * (0.32f + i * 0.055f)
+                    canvas.drawLine(x, foreheadY - 5f, x + 6f, headTopY - 28f, hairHighlight)
+                }
+            }
+            "hair_sculpted_afro" -> {
+                // Rounded cloud-like afro shape with compact curl texture
+                val afroPath = Path().apply {
+                    moveTo(w * 0.20f, foreheadY + 20f)
+                    cubicTo(w * 0.16f, headTopY - 45f, w * 0.84f, headTopY - 45f, w * 0.80f, foreheadY + 20f)
+                    lineTo(w * 0.72f, foreheadY + 5f)
+                    cubicTo(w * 0.60f, foreheadY - 15f, w * 0.40f, foreheadY - 15f, w * 0.28f, foreheadY + 5f)
+                    close()
+                }
+                canvas.drawPath(afroPath, hairPaint)
+                val curlPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(42, 38, 36)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 2.2f
+                }
+                for (i in 0..10) {
+                    val cx = w * (0.26f + (i % 6) * 0.08f)
+                    val cy = headTopY - 15f + (i / 6) * 20f
+                    canvas.drawCircle(cx, cy, 7f, curlPaint)
+                }
+            }
+            "hair_italian_wavy_flow" -> {
+                // Flowing waves down to ears
+                val wavePath = Path().apply {
+                    moveTo(w * 0.22f, foreheadY + 50f)
+                    cubicTo(w * 0.20f, headTopY - 25f, w * 0.80f, headTopY - 25f, w * 0.78f, foreheadY + 50f)
+                    lineTo(w * 0.72f, foreheadY + 30f)
+                    cubicTo(w * 0.60f, foreheadY - 10f, w * 0.40f, foreheadY - 10f, w * 0.28f, foreheadY + 30f)
+                    close()
+                }
+                canvas.drawPath(wavePath, hairPaint)
+                for (i in 0..5) {
+                    val x = w * (0.30f + i * 0.08f)
+                    canvas.drawLine(x, headTopY - 5f, x - 12f, foreheadY + 35f, hairHighlight)
+                }
+            }
+            "hair_curly_fringe" -> {
+                val base = Path().apply {
+                    moveTo(w * 0.26f, foreheadY)
+                    cubicTo(w * 0.24f, headTopY - 25f, w * 0.76f, headTopY - 25f, w * 0.74f, foreheadY)
+                    close()
+                }
+                canvas.drawPath(base, hairPaint)
+                // Curls over brow
+                val curlPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = hairPaint.color
+                }
+                for (i in 0..7) {
+                    val cx = w * (0.30f + i * 0.055f)
+                    val cy = foreheadY + (if (i % 2 == 0) 14f else 8f)
+                    canvas.drawCircle(cx, cy, 14f, curlPaint)
                 }
             }
             "hair_blunt_bob" -> {
                 val bobPath = Path().apply {
-                    moveTo(w * 0.24f, foreheadY + 80f)
-                    lineTo(w * 0.24f, headTopY)
-                    cubicTo(w * 0.32f, headTopY - 20f, w * 0.68f, headTopY - 20f, w * 0.76f, headTopY)
-                    lineTo(w * 0.76f, foreheadY + 80f)
-                    lineTo(w * 0.70f, foreheadY + 80f)
-                    lineTo(w * 0.70f, foreheadY + 20f)
-                    cubicTo(w * 0.60f, foreheadY - 10f, w * 0.40f, foreheadY - 10f, w * 0.30f, foreheadY + 20f)
-                    lineTo(w * 0.30f, foreheadY + 80f)
+                    moveTo(w * 0.22f, foreheadY + 85f)
+                    lineTo(w * 0.23f, headTopY - 10f)
+                    cubicTo(w * 0.32f, headTopY - 30f, w * 0.68f, headTopY - 30f, w * 0.77f, headTopY - 10f)
+                    lineTo(w * 0.78f, foreheadY + 85f)
+                    lineTo(w * 0.71f, foreheadY + 85f)
+                    lineTo(w * 0.71f, foreheadY + 20f)
+                    cubicTo(w * 0.60f, foreheadY - 10f, w * 0.40f, foreheadY - 10f, w * 0.29f, foreheadY + 20f)
+                    lineTo(w * 0.29f, foreheadY + 85f)
                     close()
                 }
                 canvas.drawPath(bobPath, hairPaint)
+            }
+            "hair_platinum_lob" -> {
+                val lobPath = Path().apply {
+                    moveTo(w * 0.20f, foreheadY + 120f)
+                    lineTo(w * 0.22f, headTopY - 15f)
+                    cubicTo(w * 0.32f, headTopY - 35f, w * 0.68f, headTopY - 35f, w * 0.78f, headTopY - 15f)
+                    lineTo(w * 0.80f, foreheadY + 120f)
+                    lineTo(w * 0.72f, foreheadY + 120f)
+                    lineTo(w * 0.72f, foreheadY + 25f)
+                    cubicTo(w * 0.60f, foreheadY - 10f, w * 0.40f, foreheadY - 10f, w * 0.28f, foreheadY + 25f)
+                    lineTo(w * 0.28f, foreheadY + 120f)
+                    close()
+                }
+                canvas.drawPath(lobPath, hairPaint)
+                for (i in 0..4) {
+                    val x = w * (0.24f + i * 0.12f)
+                    canvas.drawLine(x, headTopY - 5f, x, foreheadY + 110f, hairHighlight)
+                }
+            }
+            "hair_curtain_bangs" -> {
+                val curtainPath = Path().apply {
+                    moveTo(w * 0.22f, foreheadY + 90f)
+                    lineTo(w * 0.24f, headTopY - 20f)
+                    cubicTo(w * 0.35f, headTopY - 35f, w * 0.65f, headTopY - 35f, w * 0.76f, headTopY - 20f)
+                    lineTo(w * 0.78f, foreheadY + 90f)
+                    lineTo(w * 0.71f, foreheadY + 65f)
+                    cubicTo(w * 0.65f, foreheadY + 10f, w * 0.52f, foreheadY - 5f, w * 0.50f, foreheadY - 15f)
+                    cubicTo(w * 0.48f, foreheadY - 5f, w * 0.35f, foreheadY + 10f, w * 0.29f, foreheadY + 65f)
+                    close()
+                }
+                canvas.drawPath(curtainPath, hairPaint)
             }
             else -> {
                 val hairPath = Path().apply {

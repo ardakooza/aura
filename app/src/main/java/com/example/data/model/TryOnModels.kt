@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import com.example.util.QualityAssessment
 
 enum class ItemCategory(val trTitle: String, val enTitle: String) {
+    HEADWEAR("Şapka & Başlık", "Headwear & Hats"),
     EYEWEAR("Gözlük Modelleri", "Eyewear"),
     HAIRSTYLES("Saç Stilleri", "Hairstyles")
 }

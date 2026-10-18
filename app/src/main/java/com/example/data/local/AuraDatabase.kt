@@ -5,10 +5,15 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [UserProfileEntity::class], version = 1, exportSchema = false)
+@Database(
+    entities = [UserProfileEntity::class, FeedbackEntity::class],
+    version = 2,
+    exportSchema = false
+)
 abstract class AuraDatabase : RoomDatabase() {
 
     abstract fun userProfileDao(): UserProfileDao
+    abstract fun feedbackDao(): FeedbackDao
 
     companion object {
         @Volatile
@@ -20,7 +25,9 @@ abstract class AuraDatabase : RoomDatabase() {
                     context.applicationContext,
                     AuraDatabase::class.java,
                     "aura_studio.db"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

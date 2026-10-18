@@ -72,7 +72,10 @@ import kotlin.math.roundToInt
 @Composable
 fun BeforeAfterViewport(
     originalBitmap: Bitmap?,
-    resultBitmap: Bitmap?,
+    livePreviewBitmap: Bitmap? = null,
+    resultBitmap: Bitmap? = null,
+    isLivePreviewEnabled: Boolean = true,
+    onToggleLivePreview: () -> Unit = {},
     qualityAssessment: QualityAssessment?,
     isProcessing: Boolean,
     stageMessage: String,
@@ -96,17 +99,30 @@ fun BeforeAfterViewport(
         contentAlignment = Alignment.Center
     ) {
         if (originalBitmap == null) {
-            // Empty State (Strictly Real Selfie Upload without demo buttons)
+            // Empty State (Selfie Upload or Camera capture)
             EmptySelfiePrompt(
                 onPickImage = onPickImage,
                 onCaptureImage = onCaptureImage
             )
         } else {
             // Interactive Display
-            if (resultBitmap == null || isProcessing) {
+            val activeBitmap = when {
+                resultBitmap != null -> resultBitmap
+                isLivePreviewEnabled && livePreviewBitmap != null -> livePreviewBitmap
+                else -> originalBitmap
+            }
+
+            if (resultBitmap != null && !isProcessing) {
+                // Interactive Before / After Split Slider for AI Result
+                SplitComparisonView(
+                    originalBitmap = originalBitmap,
+                    resultBitmap = resultBitmap
+                )
+            } else {
+                // Display Live Real-Time Preview or Original
                 Image(
-                    bitmap = originalBitmap.asImageBitmap(),
-                    contentDescription = "Original Portrait",
+                    bitmap = activeBitmap.asImageBitmap(),
+                    contentDescription = "Portrait Viewport",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -117,12 +133,6 @@ fun BeforeAfterViewport(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-            } else {
-                // Interactive Before / After Split Slider
-                SplitComparisonView(
-                    originalBitmap = originalBitmap,
-                    resultBitmap = resultBitmap
-                )
             }
 
             // Drop Target Overlay when user is dragging an item over portrait
