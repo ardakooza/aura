@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.CatalogItem
 import com.example.data.model.ItemCategory
 import com.example.data.model.UserGender
+import com.example.ui.theme.AuraCardDark
 import com.example.ui.theme.AuraCardBorder
 import com.example.ui.theme.AuraPillInactive
 import com.example.ui.theme.AuraSurfaceElevated

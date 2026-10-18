@@ -662,8 +662,8 @@ object AuraAiEngine {
         val hairPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = when (item.id) {
                 "hair_platinum_lob" -> Color.rgb(228, 226, 220) // Platinum icy blonde
-                "hair_curtain_bangs" || "hair_italian_wavy_flow" -> Color.rgb(45, 32, 24) // Rich dark espresso
-                "hair_curly_fringe" || "hair_wolf_cut" -> Color.rgb(28, 22, 18) // Natural dark brown
+                "hair_curtain_bangs", "hair_italian_wavy_flow" -> Color.rgb(45, 32, 24) // Rich dark espresso
+                "hair_curly_fringe", "hair_wolf_cut" -> Color.rgb(28, 22, 18) // Natural dark brown
                 else -> Color.rgb(20, 18, 18) // Deep black
             }
             style = Paint.Style.FILL
